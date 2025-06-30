@@ -31,5 +31,5 @@ jobs:
           password: ${{ secrets.FTP_PASSWORD }}
           protocol: ftps
           passive: true
-          local-dir: ./dist
+          local-dir: ./dist/
           server-dir: /domains/launch.formengine.onitnow.allsrvs.online/public_html/
