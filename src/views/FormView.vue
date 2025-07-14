@@ -7,7 +7,7 @@
       <p>Loading form...</p>
     </div>
     <div v-else>
-      <SurveyComponent v-if="surveyJson" :model="surveyJson" />
+      <SurveyComponent v-if="surveyJson" :model="surveyJson as SurveyModel" />
     </div>
   </div>
 </template>
@@ -16,7 +16,7 @@
 import { ref, onMounted } from "vue";
 import { useRoute } from "vue-router";
 import NotFoundView from "@/views/NotFoundView.vue";
-import { Model } from "survey-core";
+import { SurveyModel } from "survey-core";
 import { SurveyComponent } from "survey-vue3-ui";
 import "survey-core/survey-core.css";
 import { PlainLight } from "survey-core/themes";
@@ -24,15 +24,15 @@ import { PlainLight } from "survey-core/themes";
 const route = useRoute();
 const loading = ref(true);
 const error = ref(false);
-const surveyJson = ref<Model | null>(null);
+const surveyJson = ref<SurveyModel | null>(null);
 
 // Local event handlers (safe references)
 // eslint-disable-next-line @typescript-eslint/ban-types
 const localHandlers: Record<string, Function> = {
-  handleComplete: (sender: Model) => {
+  handleComplete: (sender: SurveyModel) => {
     alert("Survey completed: " + JSON.stringify(sender.data));
   },
-  handleQuestionRender: (sender: Model, options: any) => {
+  handleQuestionRender: (sender: SurveyModel, options: any) => {
     console.log("Rendered:", options.question.name);
   },
 };
@@ -47,21 +47,25 @@ onMounted(async () => {
     if (!response.ok) throw new Error("Form not found");
 
     const apiResponse = await response.json();
+    if (!apiResponse || !apiResponse.data)
+      throw new Error("Invalid API response");
+
     const data = apiResponse.data;
 
-    if (apiResponse.statusCode !== 200 || !data?.json)
+    if (apiResponse.statusCode !== 200 || !data?.json || !data.events)
       throw new Error("Invalid form data");
 
-    const model = new Model(JSON.parse(data.json));
-
-    // Attach default event
-    model.onValueChanged.add((sender, options) => {
-      console.log("Variable changed:", options.name, options.value);
-    });
+    const model = new SurveyModel(JSON.parse(data.json));
+    model.tenantId = tenantId as string;
+    const events = JSON.parse(data.events);
+    console.log("events", events);
+    if (!Array.isArray(events)) {
+      console.warn("Events data is not an array, using empty array");
+    }
 
     // Handle dynamic event binding
-    if (Array.isArray(data.events)) {
-      for (const { event, handlerName, handler } of data.events) {
+    if (Array.isArray(events)) {
+      for (const { event, handlerName, handler } of events) {
         const eventObject = (model as any)[event];
         if (eventObject?.add) {
           // eslint-disable-next-line @typescript-eslint/ban-types
@@ -82,6 +86,8 @@ onMounted(async () => {
           }
         }
       }
+    } else {
+      console.warn("No valid events found in API response");
     }
 
     model.applyTheme(PlainLight);

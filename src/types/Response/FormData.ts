@@ -3,4 +3,5 @@ export type FormData = {
   version: string;
   title: string;
   json: string;
+  events: string;
 };
